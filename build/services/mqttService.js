@@ -25,17 +25,37 @@ var __importStar = (this && this.__importStar) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MqttService = void 0;
 const mqtt = __importStar(require("mqtt"));
+const ws_1 = require("ws");
 const mqttConfig_1 = require("../utils/mqttConfig");
+const topicResponse = 'sensor/data';
 class MqttService {
-    constructor() {
+    constructor(wss) {
+        this.ws = wss;
         this.client = mqtt.connect(`mqtt://${mqttConfig_1.mqttConfig.host}:${mqttConfig_1.mqttConfig.port}`);
         this.client.on('connect', () => {
             console.log('Conectado al broker MQTT');
             this.subscribeToTopics();
         });
-        this.client.on('message', (topic, message) => {
-            console.log(`Mensaje recibido en ${topic}: ${message.toString()}`);
-            // Aquí puedes agregar lógica para manejar mensajes
+        this.client.on('message', (topic, messageBuffer) => {
+            console.log(`Mensaje recibido en ${topic}: ${messageBuffer.toString()}`);
+            if (topic === topicResponse) {
+                const message = messageBuffer.toString();
+                const data = JSON.parse(message);
+                const dataAsString = JSON.stringify(data);
+                console.log(data);
+                if (this.ws && this.ws.clients) {
+                    this.ws.clients.forEach(function each(client) {
+                        if (client.readyState === ws_1.WebSocket.OPEN) {
+                            client.send(dataAsString);
+                        }
+                    });
+                }
+                else {
+                    console.log("WebSocket no definido.");
+                }
+            }
+        });
+        this.client.on('close', () => {
         });
     }
     subscribeToTopics() {
@@ -52,7 +72,7 @@ class MqttService {
             });
           });
         */
-        this.client.subscribe('mi/tema', (err) => {
+        this.client.subscribe('sensor/data', (err) => {
             if (!err) {
                 console.log('Suscripción a topic exitosa');
             }

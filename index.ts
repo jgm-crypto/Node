@@ -1,20 +1,32 @@
-import { MqttService } from "./services/mqttService";
+import express from 'express';
+import * as bodyParser from 'body-parser';
+import { createServer } from 'http';
+import { Server as WebSocketServer } from 'ws';
+import router from './routes/routes';
+import { initializeWebSocketServer } from './services/wsService';
+import { MqttService } from './services/mqttService';
 
-// Instanciar el servicio
-const mqttService = new MqttService();
+const app = express();
+const port = 3000;
 
-// Publicar un mensaje de prueba
-const topic = 'mi/tema';
-const message = 'Mensaje de prueba';
+// Crear un servidor HTTP a partir de la instancia de Express
+const server = createServer(app);
 
-setInterval(() => {
-  try {
-    // Se pueden mandar datos a diferentes topics o canales en el mismo proceso
-    mqttService.publishMessage(topic, message);
-  } catch (e) {
-    console.error(e);
-  }
-}, 5000);
+// Configurar el servidor WebSocket para que comparta el mismo puerto que HTTP
+const wss = new WebSocketServer({ server });
+const mqtt = new MqttService(wss);
 
+// Configuración de bodyParser para analizar JSON en las solicitudes entrantes
+app.use(bodyParser.json());
 
-// El manejo de mensajes entrantes ya está configurado en la clase MqttService
+// Configuración de rutas
+app.use('/api', router);
+
+initializeWebSocketServer(server);
+
+// Iniciar el servidor HTTP y WebSocket en el mismo puerto
+server.listen(port, () => {
+  console.log(`Servidor ejecutándose en http://localhost:${port}`);
+});
+
+export { wss, mqtt };
